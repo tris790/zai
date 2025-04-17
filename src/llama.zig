@@ -1,6 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const web_client = @import("web_client.zig");
+
 const BASE_URL = "http://localhost:11434";
 
 const headers_max_size = 1024;
@@ -148,7 +150,7 @@ fn generate(allocator: Allocator, prompt: GenerateModel) !void {
 
     const uri = try std.Uri.parse(BASE_URL ++ "/api/generate");
     const json_prompt_payload = try std.json.stringifyAlloc(allocator, prompt, .{});
-    const body = try postRequest(allocator, uri, json_prompt_payload);
+    const body = try web_client.postRequest(allocator, uri, json_prompt_payload);
     defer allocator.free(body);
 
     // try std.json.parseFromSlice(GenerateResponseModel, allocator, body, .{});
@@ -160,7 +162,7 @@ fn chat(allocator: Allocator, prompt: ChatModel) !void {
 
     const uri = try std.Uri.parse(BASE_URL ++ "/api/chat");
     const json_prompt_payload = try std.json.stringifyAlloc(allocator, prompt, .{});
-    const body = try postRequest(allocator, uri, json_prompt_payload);
+    const body = try web_client.postRequest(allocator, uri, json_prompt_payload);
     defer allocator.free(body);
 
     std.log.info("Response: {s}", .{body});
@@ -173,26 +175,6 @@ fn chat(allocator: Allocator, prompt: ChatModel) !void {
             std.log.info("Models wants to call {s}", .{tool.function.name});
         }
     }
-}
-
-fn postRequest(allocator: Allocator, uri: std.Uri, json_payload: []const u8) ![]const u8 {
-    var client = std.http.Client{ .allocator = allocator };
-    defer client.deinit();
-
-    var buf: [1024]u8 = undefined;
-    var req = try client.open(.POST, uri, .{ .server_header_buffer = &buf });
-    defer req.deinit();
-
-    req.transfer_encoding = .{ .content_length = json_payload.len };
-    try req.send();
-    var wtr = req.writer();
-    try wtr.writeAll(json_payload);
-    try req.finish();
-    try req.wait();
-
-    var rdr = req.reader();
-    const body = try rdr.readAllAlloc(allocator, 1024 * 1024 * 4);
-    return body;
 }
 
 const ChatMessageModel = struct {
