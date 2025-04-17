@@ -12,7 +12,12 @@ pub fn sdl_main() !void {
     }
 
     // Create a window
-    const window: ?*c.SDL_Window = c.SDL_CreateWindow("SDL3 Simple Example", 800, 600, c.SDL_WINDOW_BORDERLESS);
+    const window: ?*c.SDL_Window = c.SDL_CreateWindow(
+        "SDL3 Simple Example",
+        1920,
+        1080,
+        c.SDL_WINDOW_BORDERLESS | c.SDL_WINDOW_TRANSPARENT,
+    );
     if (window == null) {
         c.TTF_Quit();
         c.SDL_Quit();
@@ -78,16 +83,36 @@ pub fn sdl_main() !void {
         while (c.SDL_PollEvent(&event)) {
             if (event.type == c.SDL_EVENT_QUIT) {
                 running = false;
+            } else if (event.type == c.SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                // Get window position and size
+                var win_x: c_int = 0;
+                var win_y: c_int = 0;
+                var win_w: c_int = 0;
+                var win_h: c_int = 0;
+                _ = c.SDL_GetWindowPosition(window, &win_x, &win_y);
+                _ = c.SDL_GetWindowSize(window, &win_w, &win_h);
+
+                // Get global mouse position
+                var mouse_x: c_int = 0;
+                var mouse_y: c_int = 0;
+                _ = c.SDL_GetGlobalMouseState(@ptrCast(&mouse_x), @ptrCast(&mouse_y));
+
+                // Check if click is outside window bounds
+                if (mouse_x < win_x or mouse_x >= win_x + win_w or
+                    mouse_y < win_y or mouse_y >= win_y + win_h)
+                {
+                    running = false; // Close the window
+                }
             }
         }
 
-        // Clear screen with a color (e.g., black)
-        _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        // Clear screen with transparent background
+        _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
         _ = c.SDL_RenderClear(renderer);
 
-        // Draw a colored rectangle (e.g., red)
-        _ = c.SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        var rect: c.SDL_FRect = .{ .x = 350, .y = 250, .w = 100, .h = 100 };
+        // Draw a colored grey background rectangle
+        _ = c.SDL_SetRenderDrawColor(renderer, 33, 33, 33, 255);
+        var rect: c.SDL_FRect = .{ .x = 0, .y = 0, .w = 900, .h = 300 };
         _ = c.SDL_RenderFillRect(renderer, &rect);
 
         // Draw text
