@@ -24,10 +24,10 @@ const PromptFeedback = struct {};
 const UsageMetadata = struct {};
 
 const GeminiResponse = struct {
-    candidates: []const Candidate,
-    usageMetadata: UsageMetadata,
+    candidates: []Candidate,
+    usageMetadata: ?UsageMetadata = .{},
     modelVersion: []const u8,
-    promptFeedback: PromptFeedback,
+    promptFeedback: ?PromptFeedback = .{},
 };
 
 const GeminiRequest = struct {
@@ -52,8 +52,9 @@ pub fn postGemini(allocator: std.mem.Allocator, prompt: []const u8) !ai.AiRespon
 
     const response = try web_client.postRequest(allocator, std.Uri.parse(url) catch unreachable, stringified_payload);
     defer allocator.free(response);
-
-    const gemini_response = try std.json.parseFromSlice(GeminiResponse, allocator, response, .{});
+    const gemini_response = try std.json.parseFromSlice(GeminiResponse, allocator, response, .{
+        .ignore_unknown_fields = true,
+    });
 
     // Todo: Do something with other parts
     return .{

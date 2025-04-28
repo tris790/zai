@@ -1,137 +1,202 @@
-const c = @import("c.zig");
 const std = @import("std");
+const c = @import("c.zig");
+const Widget = @import("Widget.zig");
+const Color = @import("Color.zig");
+const Input = @import("input.zig");
 
-pub fn sdl_main() !void {
-    // Initialize SDL
-    if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
-        return error.SDLInitializationError;
+// Window dimensions
+const WINDOW_WIDTH = 800;
+const WINDOW_HEIGHT = 70;
+
+font: *c.TTF_Font,
+window: ?Window = null,
+
+pub const Window = struct {
+    renderer: *c.SDL_Renderer,
+    font: *c.TTF_Font,
+    inner: *c.SDL_Window,
+
+    pub fn setWindowSize(self: *Window, width: u32, height: u32) void {
+        _ = c.SDL_SetWindowSize(self.inner, @intCast(width), @intCast(height));
     }
 
-    if (!c.TTF_Init()) {
-        return error.TTFInitializationError;
+    pub fn render(self: *Window, widget_iter: *Widget) !void {
+        self.clearBackground();
+
+        var x: f32 = 0;
+        var y: f32 = 0;
+        var widget: ?*Widget = widget_iter;
+        while (widget) |w| {
+            const width: f32 = @floatFromInt(w.width);
+            const height: f32 = @floatFromInt(w.height);
+
+            x += @floatFromInt(w.margin_x);
+            y += @floatFromInt(w.margin_y);
+
+            if (w.background_color.a != 0) {
+                // draw background
+                self.drawRectangle(x, y, width, height, w.background_color);
+            }
+
+            if (w.border_color.a != 0) {
+                self.drawBorder(x, y, width, height, w.background_color);
+            }
+
+            if (w.text.len > 0) {
+                self.drawText(w.text, x, y, w.width, w.text_color);
+            }
+
+            // x += width;
+            // y += height;
+            widget = w.children;
+        }
+        _ = c.SDL_RenderPresent(self.renderer);
     }
 
-    // Create a window
-    const window: ?*c.SDL_Window = c.SDL_CreateWindow(
-        "SDL3 Simple Example",
-        1920,
-        1080,
-        c.SDL_WINDOW_BORDERLESS | c.SDL_WINDOW_TRANSPARENT,
-    );
-    if (window == null) {
-        c.TTF_Quit();
-        c.SDL_Quit();
-        return error.RendererCreationFailed;
-    }
-
-    // Create a renderer
-    const renderer: ?*c.SDL_Renderer = c.SDL_CreateRenderer(window, null);
-    if (renderer == null) {
-        c.SDL_DestroyWindow(window);
-        c.TTF_Quit();
-        c.SDL_Quit();
-        return error.WindowCreationFailed;
-    }
-
-    // Load font
-    const font: ?*c.TTF_Font = c.TTF_OpenFont("/usr/share/fonts/TTF/OpenSans-Bold.ttf", 150); // Ensure arial.ttf is in the working directory
-    if (font == null) {
-        std.debug.print("Font loading failed: {*}\n", .{c.SDL_GetError()});
-        c.SDL_DestroyRenderer(renderer);
-        c.SDL_DestroyWindow(window);
-        c.TTF_Quit();
-        c.SDL_Quit();
-        return error.FontLoadingFailed;
-    }
-
-    // Create text surface and texture
-    const textColor = c.SDL_Color{ .r = 255, .g = 255, .b = 255, .a = 255 }; // White text
-    const text: []const u8 = "Hello, SDL3!";
-    const textSurface: ?*c.SDL_Surface = c.TTF_RenderText_Solid(font, @as([*c]const u8, text.ptr), text.len, textColor);
-    if (textSurface == null) {
-        std.debug.print("Text surface creation failed: {*}\n", .{c.SDL_GetError()});
-        c.TTF_CloseFont(font);
-        c.SDL_DestroyRenderer(renderer);
-        c.SDL_DestroyWindow(window);
-        c.TTF_Quit();
-        c.SDL_Quit();
-        return error.TextSurfaceCreationFailed;
-    }
-
-    const textTexture: ?*c.SDL_Texture = c.SDL_CreateTextureFromSurface(renderer, textSurface);
-    if (textTexture == null) {
-        std.debug.print("Text texture creation failed: {*}\n", .{c.SDL_GetError()});
-        c.SDL_DestroySurface(textSurface);
-        c.TTF_CloseFont(font);
-        c.SDL_DestroyRenderer(renderer);
-        c.SDL_DestroyWindow(window);
-        c.TTF_Quit();
-        c.SDL_Quit();
-        return error.TextTextureCreationFailed;
-    }
-    const textWidth: f32 = @floatFromInt(textSurface.?.w);
-    const textHeight: f32 = @floatFromInt(textSurface.?.h);
-
-    // Get text dimensions
-    c.SDL_DestroySurface(textSurface);
-
-    // Main loop
-    var running: bool = true;
-    var event: c.SDL_Event = undefined;
-    while (running) {
-        // Handle events
-        while (c.SDL_PollEvent(&event)) {
-            if (event.type == c.SDL_EVENT_QUIT) {
-                running = false;
-            } else if (event.type == c.SDL_EVENT_MOUSE_BUTTON_DOWN) {
-                // Get window position and size
-                var win_x: c_int = 0;
-                var win_y: c_int = 0;
-                var win_w: c_int = 0;
-                var win_h: c_int = 0;
-                _ = c.SDL_GetWindowPosition(window, &win_x, &win_y);
-                _ = c.SDL_GetWindowSize(window, &win_w, &win_h);
-
-                // Get global mouse position
-                var mouse_x: c_int = 0;
-                var mouse_y: c_int = 0;
-                _ = c.SDL_GetGlobalMouseState(@ptrCast(&mouse_x), @ptrCast(&mouse_y));
-
-                // Check if click is outside window bounds
-                if (mouse_x < win_x or mouse_x >= win_x + win_w or
-                    mouse_y < win_y or mouse_y >= win_y + win_h)
-                {
-                    running = false; // Close the window
+    pub fn handleInput(_: *const Window, input: *Input) !void {
+        // Handle events on queue
+        var e: c.SDL_Event = undefined;
+        input.flags = .{};
+        while (c.SDL_PollEvent(&e)) {
+            // User requests quit
+            if (e.type == c.SDL_EVENT_QUIT) {
+                input.flags.exit = true;
+            }
+            // Handle keydown events
+            else if (e.type == c.SDL_EVENT_KEY_DOWN) {
+                input.flags.typed = true;
+                // In SDL3, keysym is replaced with direct key fields
+                if (e.key.key == c.SDLK_ESCAPE) {
+                    input.flags.exit = true;
+                }
+                // Handle backspace
+                else if (e.key.key == c.SDLK_BACKSPACE) {
+                    if (input.*.textInput.items.len > 0) {
+                        _ = input.*.textInput.pop();
+                    }
+                } else if (e.key.key == c.SDLK_RETURN) {
+                    input.flags.enter = true;
                 }
             }
+            // Handle text input
+            else if (e.type == c.SDL_EVENT_TEXT_INPUT) {
+                input.flags.typed = true;
+                const input_text = std.mem.span(e.text.text);
+                try input.*.textInput.appendSlice(input_text);
+            } else if (e.type == c.SDL_EVENT_MOUSE_BUTTON_DOWN) {
+                input.flags.mouse_down = true;
+            } else if (e.type == c.SDL_EVENT_MOUSE_BUTTON_UP) {
+                input.flags.mouse_up = true;
+            }
         }
-
-        // Clear screen with transparent background
-        _ = c.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
-        _ = c.SDL_RenderClear(renderer);
-
-        // Draw a colored grey background rectangle
-        _ = c.SDL_SetRenderDrawColor(renderer, 33, 33, 33, 255);
-        var rect: c.SDL_FRect = .{ .x = 0, .y = 0, .w = 900, .h = 300 };
-        _ = c.SDL_RenderFillRect(renderer, &rect);
-
-        // Draw text
-        var textRect: c.SDL_FRect = .{
-            .x = 0,
-            .y = 0,
-            .w = textWidth,
-            .h = textHeight,
-        };
-        _ = c.SDL_RenderTexture(renderer, textTexture, null, &textRect);
-
-        // Update screen
-        _ = c.SDL_RenderPresent(renderer);
-
-        // Small delay to avoid excessive CPU usage
-        c.SDL_Delay(10);
     }
 
-    // Cleanup
-    c.SDL_DestroyRenderer(renderer);
-    c.SDL_DestroyWindow(window);
+    pub fn clearBackground(self: *const Window) void {
+        _ = c.SDL_SetRenderDrawColor(self.renderer, 0, 0, 0, 255);
+        _ = c.SDL_RenderClear(self.renderer);
+    }
+
+    pub fn drawRectangle(self: *const Window, x: f32, y: f32, w: f32, h: f32, border_color: Color) void {
+        const rect = c.SDL_FRect{ .x = x, .y = y, .w = w, .h = h };
+        _ = c.SDL_SetRenderDrawColor(self.renderer, border_color.r, border_color.g, border_color.b, border_color.a);
+        _ = c.SDL_RenderFillRect(self.renderer, &rect);
+    }
+
+    pub fn drawBorder(self: *const Window, x: f32, y: f32, w: f32, h: f32, border_color: Color) void {
+        const rect = c.SDL_FRect{ .x = x, .y = y, .w = w, .h = h };
+        _ = c.SDL_SetRenderDrawColor(self.renderer, border_color.r, border_color.g, border_color.b, border_color.a);
+        _ = c.SDL_RenderRect(self.renderer, &rect);
+    }
+
+    pub fn drawText(self: *const Window, textInput: []const u8, x: f32, y: f32, max_width: u32, color: Color) void {
+        // Render text if there's any input
+        const col: c.SDL_Color = .{ .r = color.r, .g = color.g, .b = color.b, .a = color.a };
+        if (c.TTF_RenderText_Blended_Wrapped(self.font, textInput.ptr, textInput.len, col, @intCast(max_width))) |textSurface| {
+            defer c.SDL_DestroySurface(textSurface);
+            // Create texture from surface
+            const textTexture = c.SDL_CreateTextureFromSurface(self.renderer, textSurface);
+            if (textTexture != null) {
+                defer c.SDL_DestroyTexture(textTexture);
+                // Set rendering position
+                const renderRect = c.SDL_FRect{
+                    .x = x, // x position
+                    .y = y, // y position
+                    .w = @as(f32, @floatFromInt(textSurface.*.w)),
+                    .h = @as(f32, @floatFromInt(textSurface.*.h)),
+                };
+
+                // Render text
+                _ = c.SDL_RenderTexture(self.renderer, textTexture, null, &renderRect);
+            }
+        }
+    }
+};
+
+pub fn sdl_init() !@This() {
+    // Initialize SDL
+    if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
+        std.debug.print("SDL could not initialize! SDL_Error: {s}\n", .{c.SDL_GetError()});
+        return error.SDLInitializationFailed;
+    }
+
+    // Initialize SDL_ttf
+    if (!c.TTF_Init()) {
+        std.debug.print("SDL_ttf could not initialize! SDL_Error: {s}\n", .{c.SDL_GetError()});
+        return error.SDLTTFInitializationFailed;
+    }
+
+    // Load font - try different font paths for cross-platform support
+    const fontPaths = [_][:0]const u8{
+        "C:/Windows/Fonts/arial.ttf", // Windows
+        "/Library/Fonts/Arial.ttf", // macOS
+        "/usr/share/fonts/truetype/arial.ttf", // Linux
+        "/usr/share/fonts/TTF/DejaVuSans.ttf", // Linux alternative
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", // Another Linux alternative
+    };
+
+    const font = blk: {
+        for (fontPaths) |path| {
+            if (c.TTF_OpenFont(path.ptr, 24)) |loaded_font| {
+                break :blk loaded_font;
+            }
+        }
+        std.debug.print("Failed to load font! SDL_Error: {s}\n", .{c.SDL_GetError()});
+        return error.FontLoadingFailed;
+    };
+
+    return .{
+        .font = font,
+    };
+}
+
+pub fn sdl_create_window(self: @This()) !Window {
+    // Create window with borderless flag
+    const window = c.SDL_CreateWindow("Borderless Text Window", WINDOW_WIDTH, WINDOW_HEIGHT, c.SDL_WINDOW_BORDERLESS) orelse {
+        return error.WindowCreationFailed;
+    };
+
+    // Enable text input
+    _ = c.SDL_StartTextInput(window);
+
+    // Create renderer
+    const renderer = c.SDL_CreateRenderer(window, null) orelse {
+        std.debug.print("Renderer could not be created! SDL_Error: {s}\n", .{c.SDL_GetError()});
+        return error.RendererCreationFailed;
+    };
+
+    return .{
+        .renderer = renderer,
+        .inner = window,
+        .font = self.font,
+    };
+}
+
+pub fn cleanup(self: @This()) void {
+    if (self.window) |win| {
+        c.SDL_DestroyRenderer(win.renderer);
+        _ = c.SDL_StopTextInput(win.inner);
+        c.SDL_DestroyWindow(win.inner);
+    }
+    c.SDL_Quit();
+    c.TTF_Quit();
 }

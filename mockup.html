@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>App Launcher Structure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Basic body styling for context */
+        body {
+            background-color: #555; /* Placeholder background */
+            display: flex;
+            justify-content: center;
+            align-items: flex-start; /* Align launcher to top-center */
+            min-height: 100vh;
+            padding-top: 5vh; /* Add some space from the top */
+            font-family: 'Inter', sans-serif; /* Use Inter font */
+        }
+        /* Define a custom class for the selected item highlight */
+        .list-item-selected {
+             background-color: rgba(255, 255, 255, 0.1); /* Example highlight */
+        }
+        /* Style for placeholder text color */
+        input::placeholder {
+             color: #a0aec0; /* Tailwind gray-500 */
+        }
+         /* Style for the icon placeholder */
+        .icon-placeholder {
+            width: 20px;
+            height: 20px;
+            background-color: #cbd5e0; /* Tailwind gray-400 */
+            border-radius: 4px; /* Slightly rounded */
+            display: inline-block;
+            text-align: center;
+            line-height: 20px;
+            font-size: 12px;
+            color: #4a5568; /* Tailwind gray-700 */
+        }
+    </style>
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <div id="launcher-window" class="w-full max-w-2xl bg-gray-800/90 backdrop-blur-sm text-gray-200 rounded-lg shadow-xl overflow-hidden flex flex-col" style="min-height: 300px;">
+
+        <div class="p-3 border-b border-gray-700/50">
+            <input
+                type="text"
+                id="search-input"
+                placeholder="Search for apps and commands..."
+                class="w-full bg-transparent text-lg text-gray-100 placeholder-gray-500 focus:outline-none"
+            />
+        </div>
+
+        <ul id="results-list" class="flex-grow overflow-y-auto p-2 space-y-1">
+            <li class="list-item flex items-center justify-between p-2 rounded-md cursor-pointer list-item-selected">
+                <div class="flex items-center space-x-3">
+                     <span class="icon-placeholder">⚙️</span>
+                    <span class="item-name text-sm font-medium text-gray-100">About</span>
+                </div>
+                <span class="item-type text-xs text-gray-400">System Setting</span>
+            </li>
+
+            <li class="list-item flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-700/50">
+                <div class="flex items-center space-x-3">
+                     <span class="icon-placeholder"></span>
+                    <span class="item-name text-sm font-medium text-gray-100">About This Mac</span>
+                </div>
+                <span class="item-type text-xs text-gray-400">Application</span>
+            </li>
+
+            <li class="list-item flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-700/50">
+                <div class="flex items-center space-x-3">
+                     <span class="icon-placeholder">♿</span>
+                    <span class="item-name text-sm font-medium text-gray-100">Accessibility</span>
+                </div>
+                <span class="item-type text-xs text-gray-400">System Setting</span>
+            </li>
+
+             <li class="list-item flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-700/50">
+                <div class="flex items-center space-x-3">
+                     <span class="icon-placeholder">📈</span>
+                    <span class="item-name text-sm font-medium text-gray-100">Activity Monitor</span>
+                </div>
+                <span class="item-type text-xs text-gray-400">Application</span>
+            </li>
+
+             <li class="list-item flex items-center justify-between p-2 rounded-md cursor-pointer hover:bg-gray-700/50">
+                <div class="flex items-center space-x-3">
+                     <span class="icon-placeholder">🚀</span>
+                    <span class="item-name text-sm font-medium text-gray-100">AeroSpace</span>
+                </div>
+                <span class="item-type text-xs text-gray-400">Application</span>
+            </li>
+             </ul>
+
+        <div id="action-bar" class="flex items-center justify-between p-3 border-t border-gray-700/50 text-xs text-gray-400">
+            <span id="contextual-action-label">Open System Setting</span>
+
+            <div class="flex items-center space-x-2">
+                <span id="more-actions-hint">Actions</span>
+                <span id="shortcut-display" class="bg-gray-600/50 px-1.5 py-0.5 rounded">⌘ K</span>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Basic interactivity placeholder (optional)
+        const listItems = document.querySelectorAll('.list-item');
+        const selectedClass = 'list-item-selected'; // Class defined in <style>
+        const hoverClass = 'hover:bg-gray-700/50'; // Tailwind hover class
+
+        listItems.forEach(item => {
+            item.addEventListener('click', () => {
+                // Remove selected class from all items
+                listItems.forEach(i => {
+                    i.classList.remove(selectedClass);
+                    i.classList.add(hoverClass); // Ensure hover is re-enabled
+                });
+                // Add selected class to the clicked item
+                item.classList.add(selectedClass);
+                item.classList.remove(hoverClass); // Remove hover effect when selected
+
+                // --- TODO: Update Action Bar ---
+                // Get the action text and shortcut based on the selected item's data
+                // For now, just log to console
+                const itemName = item.querySelector('.item-name').textContent;
+                console.log(`Selected: ${itemName}`);
+                // Update the action bar text based on the item (example)
+                const itemTypeText = item.querySelector('.item-type').textContent;
+                const actionLabel = document.getElementById('contextual-action-label');
+                if (itemTypeText === 'Application') {
+                    actionLabel.textContent = `Open Application`;
+                } else if (itemTypeText === 'System Setting') {
+                     actionLabel.textContent = `Open System Setting`;
+                } else {
+                     actionLabel.textContent = `Perform Action`;
+                }
+            });
+        });
+    </script>
+
+</body>
+</html>
